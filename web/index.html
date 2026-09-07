@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0e17">
+  <title>Tankbot 2025 | Raspberry Pi Mobile Controller</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Header -->
+    <header class="top-bar">
+      <div class="brand">
+        <span class="pulse-icon"></span>
+        <div class="brand-text">
+          <h1>TANKBOT</h1>
+          <span class="sub-brand">RPi-2025 EDITION</span>
+        </div>
+      </div>
+
+      <div class="status-indicators">
+        <span id="hw-badge" class="badge badge-sim">SIMULATION</span>
+        <span id="conn-badge" class="badge badge-disconnected">OFFLINE</span>
+      </div>
+
+      <button id="btn-estop" class="btn-estop" title="Emergency Stop">
+        <span>STOP</span>
+      </button>
+    </header>
+
+    <!-- Content Sections / Tabs -->
+    <main class="main-content">
+      <!-- DRIVE TAB -->
+      <section id="tab-drive" class="tab-panel active">
+        <!-- Ultrasonic Radar Card -->
+        <div class="card radar-card">
+          <div class="card-header">
+            <span class="card-title">RADAR / ULTRASONIC RANGE</span>
+            <span id="proximity-alert" class="proximity-pill safe">CLEAR</span>
+          </div>
+          <div class="radar-display">
+            <div class="radar-arcs">
+              <div class="arc arc-outer"></div>
+              <div class="arc arc-mid"></div>
+              <div class="arc arc-inner"></div>
+              <div id="radar-sweep" class="radar-sweep"></div>
+              <div class="radar-tank-icon">▲</div>
+            </div>
+            <div class="radar-readout">
+              <span id="val-distance" class="dist-number">--.-</span>
+              <span class="dist-unit">CM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode Quick Selector -->
+        <div class="mode-bar">
+          <button class="mode-btn active" data-mode="MANUAL">MANUAL</button>
+          <button class="mode-btn" data-mode="OBSTACLE_AVOIDANCE">AVOID</button>
+          <button class="mode-btn" data-mode="OBJECT_FOLLOW">FOLLOW</button>
+          <button class="mode-btn" data-mode="LINE_FOLLOW">LINE</button>
+        </div>
+
+        <!-- Joystick & D-Pad Container -->
+        <div class="drive-controls-row">
+          <!-- Virtual Touch Joystick -->
+          <div class="joystick-wrapper">
+            <div class="control-label">PROPORTIONAL JOYSTICK</div>
+            <div id="joystick-zone" class="joystick-zone">
+              <div class="joystick-base">
+                <div id="joystick-stick" class="joystick-stick"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick D-Pad -->
+          <div class="dpad-wrapper">
+            <div class="control-label">DISCRETE D-PAD</div>
+            <div class="dpad">
+              <button class="dpad-btn dpad-up" data-dir="forward">▲</button>
+              <button class="dpad-btn dpad-left" data-dir="left">◀</button>
+              <button class="dpad-btn dpad-stop" data-dir="stop">■</button>
+              <button class="dpad-btn dpad-right" data-dir="right">▶</button>
+              <button class="dpad-btn dpad-down" data-dir="backward">▼</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Speed Limiter & Track Speed HUD -->
+        <div class="card speed-card">
+          <div class="speed-header">
+            <span>MAX SPEED LIMIT: <strong id="speed-limit-label">80%</strong></span>
+            <div class="track-gauges">
+              <span class="track-label">L: <strong id="left-speed-val">0%</strong></span>
+              <span class="track-label">R: <strong id="right-speed-val">0%</strong></span>
+            </div>
+          </div>
+          <input type="range" id="speed-slider" min="20" max="100" step="5" value="80">
+        </div>
+      </section>
+
+      <!-- ROBOTIC ARM TAB -->
+      <section id="tab-arm" class="tab-panel">
+        <!-- Quick Action Presets -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">AUTONOMOUS ARM PRESETS</span>
+            <span id="seq-status" class="status-sub">READY</span>
+          </div>
+          <div class="preset-grid">
+            <button class="preset-btn" data-preset="home">
+              <span class="preset-icon">🏠</span>
+              <span class="preset-name">Home Ready</span>
+            </button>
+            <button class="preset-btn btn-highlight" data-preset="grab">
+              <span class="preset-icon">🦾</span>
+              <span class="preset-name">Pick & Place</span>
+            </button>
+            <button class="preset-btn" data-preset="open_claw">
+              <span class="preset-icon">👐</span>
+              <span class="preset-name">Open Claw</span>
+            </button>
+            <button class="preset-btn" data-preset="close_claw">
+              <span class="preset-icon">✊</span>
+              <span class="preset-name">Close Claw</span>
+            </button>
+            <button class="preset-btn" data-preset="wave">
+              <span class="preset-icon">👋</span>
+              <span class="preset-name">Wave</span>
+            </button>
+            <button class="preset-btn" data-preset="rest">
+              <span class="preset-icon">💤</span>
+              <span class="preset-name">Fold / Rest</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 6-DOF Joint Sliders -->
+        <div class="card sliders-card">
+          <div class="card-header">
+            <span class="card-title">6-DOF JOINT MANIPULATION</span>
+            <span class="status-sub">0 - 1000</span>
+          </div>
+
+          <div class="joint-slider-group" data-servo="1">
+            <div class="joint-meta">
+              <span class="joint-name">Joint 1: Base Rotation</span>
+              <span id="val-servo-1" class="joint-val">600</span>
+            </div>
+            <div class="slider-row">
+              <button class="btn-step" data-step="-25" data-servo="1">-</button>
+              <input type="range" class="servo-slider" data-servo="1" min="0" max="1000" value="600">
+              <button class="btn-step" data-step="25" data-servo="1">+</button>
+            </div>
+          </div>
+
+          <div class="joint-slider-group" data-servo="2">
+            <div class="joint-meta">
+              <span class="joint-name">Joint 2: Shoulder Pitch</span>
+              <span id="val-servo-2" class="joint-val">500</span>
+            </div>
+            <div class="slider-row">
+              <button class="btn-step" data-step="-25" data-servo="2">-</button>
+              <input type="range" class="servo-slider" data-servo="2" min="0" max="1000" value="500">
+              <button class="btn-step" data-step="25" data-servo="2">+</button>
+            </div>
+          </div>
+
+          <div class="joint-slider-group" data-servo="3">
+            <div class="joint-meta">
+              <span class="joint-name">Joint 3: Elbow Pitch</span>
+              <span id="val-servo-3" class="joint-val">350</span>
+            </div>
+            <div class="slider-row">
+              <button class="btn-step" data-step="-25" data-servo="3">-</button>
+              <input type="range" class="servo-slider" data-servo="3" min="0" max="1000" value="350">
+              <button class="btn-step" data-step="25" data-servo="3">+</button>
+            </div>
+          </div>
+
+          <div class="joint-slider-group" data-servo="4">
+            <div class="joint-meta">
+              <span class="joint-name">Joint 4: Wrist Pitch</span>
+              <span id="val-servo-4" class="joint-val">100</span>
+            </div>
+            <div class="slider-row">
+              <button class="btn-step" data-step="-25" data-servo="4">-</button>
+              <input type="range" class="servo-slider" data-servo="4" min="0" max="1000" value="100">
+              <button class="btn-step" data-step="25" data-servo="4">+</button>
+            </div>
+          </div>
+
+          <div class="joint-slider-group" data-servo="5">
+            <div class="joint-meta">
+              <span class="joint-name">Joint 5: Wrist Roll</span>
+              <span id="val-servo-5" class="joint-val">300</span>
+            </div>
+            <div class="slider-row">
+              <button class="btn-step" data-step="-25" data-servo="5">-</button>
+              <input type="range" class="servo-slider" data-servo="5" min="0" max="1000" value="300">
+              <button class="btn-step" data-step="25" data-servo="5">+</button>
+            </div>
+          </div>
+
+          <div class="joint-slider-group" data-servo="6">
+            <div class="joint-meta">
+              <span class="joint-name">Joint 6: Gripper Claw</span>
+              <span id="val-servo-6" class="joint-val">500</span>
+            </div>
+            <div class="slider-row">
+              <button class="btn-step" data-step="-25" data-servo="6">-</button>
+              <input type="range" class="servo-slider" data-servo="6" min="125" max="875" value="500">
+              <button class="btn-step" data-step="25" data-servo="6">+</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SENSORS & AUTONOMY TAB -->
+      <section id="tab-sensors" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">ACTIVE OPERATION MODE</span>
+            <span id="cur-mode-label" class="badge badge-active">MANUAL</span>
+          </div>
+          <div class="mode-explain" id="mode-explain-text">
+            Manual remote control via touch joystick and arm sliders.
+          </div>
+        </div>
+
+        <!-- 4-Channel Line Tracker Display -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">4-CHANNEL LINE SENSORS</span>
+            <span class="status-sub">IR Reflectivity</span>
+          </div>
+          <div class="line-sensor-row">
+            <div class="ir-sensor" id="ir-0"><span class="ir-dot"></span><span>L2</span></div>
+            <div class="ir-sensor" id="ir-1"><span class="ir-dot"></span><span>L1</span></div>
+            <div class="ir-sensor" id="ir-2"><span class="ir-dot"></span><span>R1</span></div>
+            <div class="ir-sensor" id="ir-3"><span class="ir-dot"></span><span>R2</span></div>
+          </div>
+        </div>
+
+        <!-- MPU6050 IMU Posture -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">MPU6050 6-AXIS IMU POSTURE</span>
+            <span id="imu-status" class="proximity-pill safe">LEVEL</span>
+          </div>
+          <div class="imu-grid">
+            <div class="imu-box">
+              <span class="imu-label">PITCH</span>
+              <span id="imu-pitch" class="imu-value">0.0°</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">ROLL</span>
+              <span id="imu-roll" class="imu-value">0.0°</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">BATTERY</span>
+              <span id="bat-voltage" class="imu-value">7.4V (85%)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SETTINGS & PINOUT TAB -->
+      <section id="tab-settings" class="tab-panel">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">RASPBERRY PI PINOUT (BCM)</span>
+          </div>
+          <div class="pinout-table">
+            <div class="pin-row"><span>Left Motor IN1/IN2/PWM:</span> <strong>GPIO 20, 21, 16</strong></div>
+            <div class="pin-row"><span>Right Motor IN3/IN4/PWM:</span> <strong>GPIO 19, 26, 13</strong></div>
+            <div class="pin-row"><span>Ultrasonic TRIG / ECHO:</span> <strong>GPIO 23 / 24</strong></div>
+            <div class="pin-row"><span>Bus Servos (UART TX/RX):</span> <strong>GPIO 14 / 15 (/dev/serial0)</strong></div>
+            <div class="pin-row"><span>MPU6050 (I2C SDA/SCL):</span> <strong>GPIO 2 / 3 (Bus 1)</strong></div>
+            <div class="pin-row"><span>Line Tracker IR (4-Ch):</span> <strong>GPIO 5, 6, 12, 25</strong></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">SYSTEM ACTIONS</span>
+          </div>
+          <div class="system-actions">
+            <button id="btn-reset-estop" class="btn-action">RESET EMERGENCY STOP</button>
+            <button id="btn-reconnect" class="btn-action">RECONNECT WEBSOCKET</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-tab="tab-drive">
+        <span class="nav-icon">🕹️</span>
+        <span class="nav-label">DRIVE</span>
+      </button>
+      <button class="nav-item" data-tab="tab-arm">
+        <span class="nav-icon">🦾</span>
+        <span class="nav-label">ARM</span>
+      </button>
+      <button class="nav-item" data-tab="tab-sensors">
+        <span class="nav-icon">📡</span>
+        <span class="nav-label">SENSORS</span>
+      </button>
+      <button class="nav-item" data-tab="tab-settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">PINOUT</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
