@@ -28,7 +28,7 @@ MOTOR_CONFIG = {
     "in3": 26,            # Pi GPIO 26 (Pin 37) -> Socket P8 Pin 14 (L298N_IN3)
     "in4": 16,            # Pi GPIO 16 (Pin 36) -> Socket P8 Pin 15 (L298N_IN4)
 
-    "invert_left": False,
+    "invert_left": True,
     "invert_right": False,
     "pwm_freq": 1000,     # 1 KHz matching STM32 100us timer loop
     "deadzone": 5,        # Deadband cutoff to prevent motor whine at near-zero

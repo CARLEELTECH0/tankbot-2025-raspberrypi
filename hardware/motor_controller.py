@@ -58,16 +58,14 @@ class MotorController:
         if abs(m2_speed) < self.deadzone:
             m2_speed = 0
 
-        if self.invert_left:
-            m1_speed = -m1_speed
-        if self.invert_right:
-            m2_speed = -m2_speed
-
         self.current_left_speed = m1_speed
         self.current_right_speed = m2_speed
 
-        self._drive_left(m1_speed)
-        self._drive_right(m2_speed)
+        drive_m1 = -m1_speed if self.invert_left else m1_speed
+        drive_m2 = -m2_speed if self.invert_right else m2_speed
+
+        self._drive_left(drive_m1)
+        self._drive_right(drive_m2)
 
     def _drive_left(self, speed: int):
         """
