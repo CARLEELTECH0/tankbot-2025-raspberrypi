@@ -271,6 +271,86 @@
         </div>
       </section>
 
+      <!-- VISION & AI TAB (v2.0) -->
+      <section id="tab-vision" class="tab-panel">
+        <!-- Live Video Stream Card -->
+        <div class="card video-card">
+          <div class="card-header">
+            <span class="card-title">LIVE OPENCV CV FEED (640x480)</span>
+            <div class="video-badges">
+              <span id="vision-fps-badge" class="badge badge-active">30 FPS</span>
+              <span id="vision-status-badge" class="proximity-pill warn">SEARCHING</span>
+            </div>
+          </div>
+          <div class="video-container">
+            <img id="camera-stream" src="/video_feed" alt="Tankbot Live Stream" loading="lazy">
+            <div class="crosshair-overlay">
+              <div class="crosshair-ch"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Target Color Selector -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">TRACKING TARGET COLOR</span>
+            <span class="status-sub">LAB Thresholds</span>
+          </div>
+          <div class="color-pills">
+            <button class="color-pill pill-red active" data-color="red">🔴 RED</button>
+            <button class="color-pill pill-green" data-color="green">🟢 GREEN</button>
+            <button class="color-pill pill-blue" data-color="blue">🔵 BLUE</button>
+            <button class="color-pill pill-off" data-color="none">⚪ OFF</button>
+          </div>
+        </div>
+
+        <!-- Vision State & 3D Coordinates HUD -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">PERCEPTION HUD (COGNITION & IK)</span>
+            <span id="vision-lock-indicator" class="status-sub">NO TARGET</span>
+          </div>
+          <div class="imu-grid">
+            <div class="imu-box">
+              <span class="imu-label">WORLD X (CM)</span>
+              <span id="val-vision-x" class="imu-value">--.-</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">WORLD Y (CM)</span>
+              <span id="val-vision-y" class="imu-value">--.-</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">WORLD Z (CM)</span>
+              <span id="val-vision-z" class="imu-value">2.0</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">PIXEL ERROR (EX, EY)</span>
+              <span id="val-vision-err" class="imu-value">0, 0</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">OBJECT ANGLE</span>
+              <span id="val-vision-angle" class="imu-value">0°</span>
+            </div>
+            <div class="imu-box">
+              <span class="imu-label">WRIST ALIGN PULSE</span>
+              <span id="val-vision-wrist" class="imu-value">500</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Autonomous Closed-Loop Actions -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">SEE-THINK-ACT AUTONOMOUS MODES</span>
+          </div>
+          <div class="system-actions">
+            <button id="btn-auto-track" class="btn-action">🎯 AUTO TRACK TARGET</button>
+            <button id="btn-vision-pick" class="btn-action btn-highlight">🦾 VISION PICK & PLACE</button>
+            <button id="btn-vision-home" class="btn-action">🏠 ARM HOME READY</button>
+          </div>
+        </div>
+      </section>
+
       <!-- SETTINGS & PINOUT TAB -->
       <section id="tab-settings" class="tab-panel">
         <div class="card">
@@ -278,12 +358,13 @@
             <span class="card-title">RASPBERRY PI PINOUT (BCM)</span>
           </div>
           <div class="pinout-table">
-            <div class="pin-row"><span>Left Motor IN1/IN2/PWM:</span> <strong>GPIO 20, 21, 16</strong></div>
-            <div class="pin-row"><span>Right Motor IN3/IN4/PWM:</span> <strong>GPIO 19, 26, 13</strong></div>
-            <div class="pin-row"><span>Ultrasonic TRIG / ECHO:</span> <strong>GPIO 23 / 24</strong></div>
-            <div class="pin-row"><span>Bus Servos (UART TX/RX):</span> <strong>GPIO 14 / 15 (/dev/serial0)</strong></div>
-            <div class="pin-row"><span>MPU6050 (I2C SDA/SCL):</span> <strong>GPIO 2 / 3 (Bus 1)</strong></div>
-            <div class="pin-row"><span>Line Tracker IR (4-Ch):</span> <strong>GPIO 5, 6, 12, 25</strong></div>
+            <div class="pin-row"><span>Left Motor IN1/IN2 (PWM):</span> <strong>GPIO 20, 21 (Zero Enable)</strong></div>
+            <div class="pin-row"><span>Right Motor IN3/IN4 (PWM):</span> <strong>GPIO 26, 16 (Zero Enable)</strong></div>
+            <div class="pin-row"><span>Bus Servos (UART TX/RX):</span> <strong>GPIO 14, 15 (/dev/serial0)</strong></div>
+            <div class="pin-row"><span>Servo Buffer (TX_EN/RX_EN):</span> <strong>GPIO 27, 17 (74HC126)</strong></div>
+            <div class="pin-row"><span>USB Camera (/dev/video0):</span> <strong>USB-A 3.0 (640x480 @ 30FPS)</strong></div>
+            <div class="pin-row"><span>I2C Bus 1 (Line & IMU):</span> <strong>GPIO 2 (SDA), GPIO 3 (SCL)</strong></div>
+            <div class="pin-row"><span>Ultrasonic TRIG / ECHO:</span> <strong>GPIO 23 / 24 (1k/2k Divider)</strong></div>
           </div>
         </div>
 
@@ -308,6 +389,10 @@
       <button class="nav-item" data-tab="tab-arm">
         <span class="nav-icon">🦾</span>
         <span class="nav-label">ARM</span>
+      </button>
+      <button class="nav-item" data-tab="tab-vision">
+        <span class="nav-icon">👁️</span>
+        <span class="nav-label">VISION</span>
       </button>
       <button class="nav-item" data-tab="tab-sensors">
         <span class="nav-icon">📡</span>

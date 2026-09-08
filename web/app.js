@@ -19,6 +19,7 @@ class TankbotClient {
     this.initDPad();
     this.initArmControls();
     this.initModes();
+    this.initVisionControls();
     this.initKeyboard();
     this.connectWebSocket();
 
@@ -50,6 +51,17 @@ class TankbotClient {
     this.imuRoll = document.getElementById('imu-roll');
     this.imuStatus = document.getElementById('imu-status');
     this.batVoltage = document.getElementById('bat-voltage');
+
+    // Vision HUD Elements (v2.0)
+    this.valVisionX = document.getElementById('val-vision-x');
+    this.valVisionY = document.getElementById('val-vision-y');
+    this.valVisionZ = document.getElementById('val-vision-z');
+    this.valVisionErr = document.getElementById('val-vision-err');
+    this.valVisionAngle = document.getElementById('val-vision-angle');
+    this.valVisionWrist = document.getElementById('val-vision-wrist');
+    this.visionFpsBadge = document.getElementById('vision-fps-badge');
+    this.visionStatusBadge = document.getElementById('vision-status-badge');
+    this.visionLockIndicator = document.getElementById('vision-lock-indicator');
 
     this.irSensors = [
       document.getElementById('ir-0'),
@@ -349,6 +361,41 @@ class TankbotClient {
     });
   }
 
+  /* VISION & AI CONTROLS (v2.0) */
+  initVisionControls() {
+    // Target Color Selection Pills
+    const colorPills = document.querySelectorAll('.color-pill');
+    colorPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        this.haptic(25);
+        colorPills.forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        const color = pill.dataset.color;
+        this.send({ type: 'vision_color', color: color });
+      });
+    });
+
+    // Auto Track Button
+    document.getElementById('btn-auto-track')?.addEventListener('click', () => {
+      this.haptic(30);
+      const isTracking = this.curModeLabel.textContent === 'VISION_TRACK';
+      const newMode = isTracking ? 'MANUAL' : 'VISION_TRACK';
+      this.send({ type: 'vision_mode', mode: newMode });
+    });
+
+    // Vision Pick & Place Button
+    document.getElementById('btn-vision-pick')?.addEventListener('click', () => {
+      this.haptic([50, 50, 100]);
+      this.send({ type: 'vision_pick' });
+    });
+
+    // Vision Home Button
+    document.getElementById('btn-vision-home')?.addEventListener('click', () => {
+      this.haptic(20);
+      this.send({ type: 'preset', name: 'home' });
+    });
+  }
+
   /* DESKTOP KEYBOARD CONTROLS */
   initKeyboard() {
     const activeKeys = new Set();
@@ -472,6 +519,48 @@ class TankbotClient {
         }
       });
       this.curModeLabel.textContent = data.mode;
+    }
+
+    // Vision Telemetry (v2.0)
+    if (this.valVisionX && data.vision_coords) {
+      const wx = data.vision_coords.x;
+      const wy = data.vision_coords.y;
+      const wz = data.vision_coords.z;
+      this.valVisionX.textContent = (wx !== undefined && data.vision_detected) ? `${wx > 0 ? '+' : ''}${wx.toFixed(1)}` : '--.-';
+      this.valVisionY.textContent = (wy !== undefined && data.vision_detected) ? `${wy.toFixed(1)}` : '--.-';
+      this.valVisionZ.textContent = (wz !== undefined && data.vision_detected) ? `${wz.toFixed(1)}` : '2.0';
+
+      if (this.valVisionErr) {
+        const ex = data.vision_error_x || 0;
+        const ey = data.vision_error_y || 0;
+        this.valVisionErr.textContent = `${ex > 0 ? '+' : ''}${ex}, ${ey > 0 ? '+' : ''}${ey}px`;
+      }
+
+      if (this.valVisionAngle) {
+        const ang = data.vision_rotation_angle || 0;
+        this.valVisionAngle.textContent = `${ang.toFixed(0)}°`;
+      }
+
+      if (this.valVisionWrist) {
+        this.valVisionWrist.textContent = data.vision_wrist_pulse || 500;
+      }
+
+      if (this.visionFpsBadge) {
+        const fps = data.camera_fps ? data.camera_fps.toFixed(0) : '30';
+        this.visionFpsBadge.textContent = `${fps} FPS`;
+      }
+
+      if (this.visionStatusBadge) {
+        const status = data.vision_status || 'SEARCHING';
+        this.visionStatusBadge.textContent = status;
+        if (data.vision_detected) {
+          this.visionStatusBadge.className = 'proximity-pill safe';
+          if (this.visionLockIndicator) this.visionLockIndicator.textContent = `LOCKED (${data.vision_target_color?.toUpperCase() || ''})`;
+        } else {
+          this.visionStatusBadge.className = 'proximity-pill warn';
+          if (this.visionLockIndicator) this.visionLockIndicator.textContent = 'SEARCHING';
+        }
+      }
     }
   }
 }

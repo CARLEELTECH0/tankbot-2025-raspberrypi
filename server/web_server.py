@@ -29,9 +29,12 @@ class TankbotWebServer:
     def _setup_routes(self):
         self.app.router.add_get("/", self._handle_index)
         self.app.router.add_get("/ws", self._handle_websocket)
+        self.app.router.add_get("/video_feed", self._handle_video_feed)
         self.app.router.add_get("/api/status", self._handle_api_status)
         self.app.router.add_post("/api/emergency_stop", self._handle_api_estop)
         self.app.router.add_post("/api/mode", self._handle_api_mode)
+        self.app.router.add_post("/api/vision/color", self._handle_api_vision_color)
+        self.app.router.add_post("/api/vision/preset", self._handle_api_vision_preset)
 
         # Serve static assets (CSS, JS, icons)
         self.app.router.add_static("/static/", path=str(WEB_DIR), name="static")
@@ -41,6 +44,46 @@ class TankbotWebServer:
         if not index_file.exists():
             return web.Response(text="Tankbot Web UI index.html not found.", status=404)
         return web.FileResponse(index_file)
+
+    async def _handle_video_feed(self, request: web.Request):
+        """Streams live annotated MJPEG video over HTTP for Mobile UI"""
+        response = web.StreamResponse(
+            status=200,
+            reason="OK",
+            headers={
+                "Content-Type": "multipart/x-mixed-replace; boundary=frame",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            }
+        )
+        await response.prepare(request)
+
+        try:
+            while True:
+                frame = self.robot.camera.get_frame()
+                if frame is not None:
+                    # Run color tracking & annotation
+                    annotated_frame, _ = self.robot.color_tracker.process_frame(frame, annotate=True)
+                    try:
+                        import cv2
+                        ret, buf = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 65])
+                        if ret:
+                            jpeg_data = buf.tobytes()
+                            header = (
+                                f"--frame\r\n"
+                                f"Content-Type: image/jpeg\r\n"
+                                f"Content-Length: {len(jpeg_data)}\r\n\r\n"
+                            ).encode("utf-8")
+                            await response.write(header + jpeg_data + b"\r\n")
+                    except Exception as e:
+                        logger.debug(f"Video frame encode error: {e}")
+
+                await asyncio.sleep(0.04)  # ~25 FPS stream
+        except (asyncio.CancelledError, ConnectionResetError):
+            pass
+
+        return response
 
     async def _handle_api_status(self, request: web.Request):
         return web.json_response(self.robot.get_telemetry())
@@ -59,6 +102,24 @@ class TankbotWebServer:
         except Exception as e:
             return web.json_response({"error": str(e)}, status=400)
         return web.json_response({"error": "Invalid mode request"}, status=400)
+
+    async def _handle_api_vision_color(self, request: web.Request):
+        try:
+            data = await request.json()
+            color = data.get("color", "red")
+            self.robot.color_tracker.set_target_color(color)
+            return web.json_response({"status": "OK", "target_color": self.robot.color_tracker.target_color})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
+
+    async def _handle_api_vision_preset(self, request: web.Request):
+        try:
+            data = await request.json()
+            action = data.get("action", "vision_pick_and_place")
+            self.robot.trigger_preset(action)
+            return web.json_response({"status": "OK", "action": action})
+        except Exception as e:
+            return web.json_response({"error": str(e)}, status=400)
 
     async def _handle_websocket(self, request: web.Request):
         ws = web.WebSocketResponse(heartbeat=10.0)
@@ -139,6 +200,18 @@ class TankbotWebServer:
             mode = cmd.get("mode")
             if mode:
                 self.robot.set_mode(mode)
+
+        elif cmd_type == "vision_color":
+            color = cmd.get("color", "red")
+            self.robot.color_tracker.set_target_color(color)
+
+        elif cmd_type == "vision_mode":
+            mode = cmd.get("mode")
+            if mode:
+                self.robot.set_mode(mode)
+
+        elif cmd_type == "vision_pick":
+            self.robot.trigger_preset("vision_pick_and_place")
 
         elif cmd_type == "emergency_stop":
             self.robot.emergency_stop()

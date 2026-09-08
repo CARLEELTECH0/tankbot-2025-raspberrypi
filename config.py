@@ -10,11 +10,36 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
 
+# System Version
+SYSTEM_VERSION = "2.0.0"
+
 # Network & Web Server
 SERVER_CONFIG = {
     "host": "0.0.0.0",
     "port": int(os.getenv("TANKBOT_PORT", 8080)),
     "broadcast_interval_hz": 20,
+}
+
+# USB Camera Configuration (OpenCV cv2.VideoCapture over USB-A)
+# Locked to 640x480 @ 30 FPS to optimize Raspberry Pi 4B CPU load
+CAMERA_CONFIG = {
+    "device": os.getenv("TANKBOT_CAMERA_DEV", "/dev/video0"),
+    "resolution": (640, 480),
+    "fps": 30,
+    "fourcc": "MJPG",
+}
+
+# Computer Vision & Color Tracking Configuration
+# Ported from Hiwonder ArmPi community vision pipeline (/Functions/ColorTracking.py)
+VISION_CONFIG = {
+    "enabled": True,
+    "default_target_color": "red",
+    "color_space": "LAB",            # "LAB" or "HSV"
+    "map_param": 0.05,               # cm per pixel
+    "image_center_distance": 20.0,   # cm from arm base to camera center
+    "min_contour_area": 300.0,
+    "trigger_contour_area": 1800.0,
+    "stream_jpeg_quality": 75,
 }
 
 # Motor Controller: Pure 4-Channel PWM (Zero Enable Pins)

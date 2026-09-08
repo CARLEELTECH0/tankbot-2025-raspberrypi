@@ -7,7 +7,7 @@ import time
 import asyncio
 import logging
 from typing import Optional, Dict
-from config import ULTRASONIC_CONFIG, SAFETY_CONFIG
+from config import ULTRASONIC_CONFIG, SAFETY_CONFIG, CAMERA_CONFIG, VISION_CONFIG
 from hardware import (
     HAL,
     MotorController,
@@ -16,6 +16,7 @@ from hardware import (
     LineFollower,
     IMUSensor
 )
+from vision import CameraProcessor, ColorTracker, IKBridge
 from core.telemetry import TelemetryData
 
 logger = logging.getLogger("Tankbot.Core")
@@ -32,7 +33,25 @@ class Tankbot:
         self.line_follower = LineFollower()
         self.imu = IMUSensor()
 
-        self.mode = "MANUAL"  # MANUAL, OBSTACLE_AVOIDANCE, OBJECT_FOLLOW, LINE_FOLLOW
+        # Computer Vision & Inverse Kinematics Stack (v2.0)
+        self.camera = CameraProcessor(
+            device=CAMERA_CONFIG.get("device", "/dev/video0"),
+            resolution=CAMERA_CONFIG.get("resolution", (640, 480)),
+            target_fps=CAMERA_CONFIG.get("fps", 30),
+            fourcc=CAMERA_CONFIG.get("fourcc", "MJPG")
+        )
+        self.color_tracker = ColorTracker(
+            target_color=VISION_CONFIG.get("default_target_color", "red"),
+            color_space=VISION_CONFIG.get("color_space", "LAB"),
+            map_param=VISION_CONFIG.get("map_param", 0.05),
+            image_center_distance=VISION_CONFIG.get("image_center_distance", 20.0),
+            min_contour_area=VISION_CONFIG.get("min_contour_area", 300.0),
+            trigger_contour_area=VISION_CONFIG.get("trigger_contour_area", 1800.0)
+        )
+        self.ik_bridge = IKBridge()
+        self.camera.start()
+
+        self.mode = "MANUAL"  # MANUAL, OBSTACLE_AVOIDANCE, OBJECT_FOLLOW, LINE_FOLLOW, VISION_TRACK, VISION_PICK_PLACE
         self.emergency_stopped = False
         self.active_sequence_name: Optional[str] = None
         self._sequence_task: Optional[asyncio.Task] = None
@@ -51,11 +70,12 @@ class Tankbot:
             is_simulation=self.hal.is_simulation,
             servo_positions=self.servos.get_positions()
         )
-        logger.info("Tankbot core system initialized.")
+        logger.info("Tankbot core system initialized with CV & IK v2.0.")
 
     async def start(self):
         """Starts background autonomous loop and safety monitor"""
         self._running = True
+        self.camera.start()
         self._autonomous_task = asyncio.create_task(self._control_loop())
         logger.info("Tankbot background tasks started.")
 
@@ -66,6 +86,7 @@ class Tankbot:
             self._autonomous_task.cancel()
         if self._sequence_task:
             self._sequence_task.cancel()
+        self.camera.stop()
         self.motors.stop()
         self.hal.cleanup()
         logger.info("Tankbot stopped cleanly.")
@@ -76,7 +97,14 @@ class Tankbot:
 
     def set_mode(self, mode: str):
         """Switches operating mode"""
-        valid_modes = ["MANUAL", "OBSTACLE_AVOIDANCE", "OBJECT_FOLLOW", "LINE_FOLLOW"]
+        valid_modes = [
+            "MANUAL",
+            "OBSTACLE_AVOIDANCE",
+            "OBJECT_FOLLOW",
+            "LINE_FOLLOW",
+            "VISION_TRACK",
+            "VISION_PICK_PLACE"
+        ]
         if mode in valid_modes:
             if self._sequence_task and not self._sequence_task.done():
                 self._sequence_task.cancel()
@@ -152,6 +180,12 @@ class Tankbot:
         elif preset_name == "rest":
             self.servos.set_multiple({1: 500, 2: 200, 3: 150, 4: 100, 5: 500, 6: 200}, 1000)
             self.telemetry.servo_positions = self.servos.get_positions()
+        elif preset_name == "vision_pick_and_place":
+            if self._sequence_task and not self._sequence_task.done():
+                self._sequence_task.cancel()
+            self.active_sequence_name = "vision_pick_and_place"
+            self.telemetry.active_sequence = "vision_pick_and_place"
+            self._sequence_task = asyncio.create_task(self._run_vision_pick_and_place())
         elif preset_name == "wave":
             self.servos.set_multiple({1: 500, 2: 750, 3: 500, 4: 300, 5: 700, 6: 500}, 800)
             self.telemetry.servo_positions = self.servos.get_positions()
@@ -161,6 +195,84 @@ class Tankbot:
             await self.servos.execute_grab_sequence()
         except asyncio.CancelledError:
             pass
+        finally:
+            self.active_sequence_name = None
+            self.telemetry.active_sequence = None
+
+    async def _run_vision_pick_and_place(self):
+        """
+        Autonomous 8-step visual pick and place routine.
+        Uses detected target coordinates (world_x, world_y) from CV
+        and computes inverse kinematics to grasp and sort colored block.
+        """
+        try:
+            logger.info("Starting visual pick-and-place routine...")
+            det = self.color_tracker.last_result
+            if not det.detected:
+                logger.warning("No target detected for vision pick & place! Aborting.")
+                return
+
+            wx, wy = det.world_x, det.world_y
+            wrist_pulse = det.wrist_servo_pulse
+            color = det.color
+
+            # Step 1: Open claw and hover over target
+            self.servos.open_claw()
+            hover_pose = self.ik_bridge.calculate_target_pose(
+                wx, wy, world_z=8.0, alpha=-80.0, wrist_roll_pulse=wrist_pulse, claw_pulse=200
+            )
+            if hover_pose:
+                self.servos.set_multiple(hover_pose, duration_ms=1000)
+                await asyncio.sleep(1.2)
+
+            # Step 2: Descend to grasping elevation
+            grasp_pose = self.ik_bridge.calculate_target_pose(
+                wx, wy, world_z=2.0, alpha=-85.0, wrist_roll_pulse=wrist_pulse, claw_pulse=200
+            )
+            if grasp_pose:
+                self.servos.set_multiple(grasp_pose, duration_ms=800)
+                await asyncio.sleep(1.0)
+
+            # Step 3: Close claw to grasp block
+            self.servos.close_claw(duration_ms=600)
+            await asyncio.sleep(0.8)
+
+            # Step 4: Lift object upward
+            lift_pose = self.ik_bridge.calculate_target_pose(
+                wx, wy, world_z=12.0, alpha=-70.0, wrist_roll_pulse=wrist_pulse, claw_pulse=550
+            )
+            if lift_pose:
+                self.servos.set_multiple(lift_pose, duration_ms=800)
+                await asyncio.sleep(1.0)
+
+            # Step 5: Rotate and move to sorted color bin
+            bin_coords = self.ik_bridge.get_bin_coordinate(color)
+            bin_pose = self.ik_bridge.calculate_target_pose(
+                bin_coords[0], bin_coords[1], world_z=bin_coords[2] + 6.0, alpha=-70.0, claw_pulse=550
+            )
+            if bin_pose:
+                self.servos.set_multiple(bin_pose, duration_ms=1200)
+                await asyncio.sleep(1.4)
+
+            # Step 6: Lower to bin
+            bin_drop_pose = self.ik_bridge.calculate_target_pose(
+                bin_coords[0], bin_coords[1], world_z=bin_coords[2], alpha=-80.0, claw_pulse=550
+            )
+            if bin_drop_pose:
+                self.servos.set_multiple(bin_drop_pose, duration_ms=600)
+                await asyncio.sleep(0.8)
+
+            # Step 7: Open claw to release
+            self.servos.open_claw(duration_ms=500)
+            await asyncio.sleep(0.7)
+
+            # Step 8: Return home
+            self.servos.home(duration_ms=1200)
+            await asyncio.sleep(1.3)
+            logger.info(f"Visual pick-and-place complete for {color} block!")
+
+        except asyncio.CancelledError:
+            logger.info("Visual pick-and-place cancelled.")
         finally:
             self.active_sequence_name = None
             self.telemetry.active_sequence = None
@@ -194,9 +306,30 @@ class Tankbot:
                 dist_mm = self.ultrasonic.measure_distance_mm(sim_speed)
                 dist_cm = round(dist_mm / 10.0, 1)
 
-                # IMU reading
+                # IMU & Line reading
                 imu_data = self.imu.read_posture()
                 line_states = self.line_follower.read_sensors()
+
+                # Computer Vision Processing
+                frame = self.camera.get_frame()
+                if frame is not None and self.color_tracker.target_color not in ["none", "off"]:
+                    _, det = self.color_tracker.process_frame(frame, annotate=True)
+                    self.telemetry.vision_detected = det.detected
+                    self.telemetry.vision_target_color = det.color
+                    self.telemetry.vision_coords = {"x": det.world_x, "y": det.world_y, "z": det.world_z}
+                    self.telemetry.vision_rotation_angle = det.rotation_angle
+                    self.telemetry.vision_wrist_pulse = det.wrist_servo_pulse
+                    self.telemetry.vision_status = det.status
+                    self.telemetry.camera_fps = self.camera.get_fps()
+
+                    # Autonomous Vision Tracking
+                    if not self.emergency_stopped and self.mode == "VISION_TRACK" and det.detected:
+                        track_pose = self.ik_bridge.calculate_target_pose(
+                            det.world_x, det.world_y, world_z=6.0, alpha=-70.0,
+                            wrist_roll_pulse=det.wrist_servo_pulse, claw_pulse=200
+                        )
+                        if track_pose:
+                            self.servos.set_multiple(track_pose, duration_ms=60)
 
                 # Autonomous Mode Execution
                 if not self.emergency_stopped:

@@ -37,6 +37,16 @@ class TelemetryData:
     battery_pct: int = 85
     heartbeat_ok: bool = True
 
+    # Computer Vision & Color Tracking (v2.0)
+    vision_enabled: bool = True
+    vision_target_color: str = "red"
+    vision_detected: bool = False
+    vision_coords: Dict[str, float] = field(default_factory=lambda: {"x": 0.0, "y": 0.0, "z": 2.0})
+    vision_rotation_angle: float = 0.0
+    vision_wrist_pulse: int = 500
+    vision_status: str = "SEARCHING"
+    camera_fps: float = 0.0
+
     def to_dict(self) -> dict:
         d = asdict(self)
         d["timestamp"] = round(self.timestamp, 3)

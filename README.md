@@ -109,30 +109,70 @@ Console Output:
 
 ---
 
+---
+
+## 👁️ Computer Vision & Kinematics Architecture (v2.0)
+
+Version 2.0 transforms Tankbot into a closed-loop **See-Think-Act** autonomous edge-robotics platform:
+
+```text
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                         THREAD 1: PERCEPTION                           │
+ │  USB-A Camera (/dev/video0) ──► OpenCV LAB/HSV Segmentation ──► ex, ey │
+ └───────────────────────────────────┬────────────────────────────────────┘
+                                     │ (Thread-Safe Shared State)
+                                     ▼
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                         THREAD 2: COGNITION & IK                       │
+ │  State Machine (SEARCHING ──► TRACKING ──► LOCKING ──► GRASP ──► DEPOSIT)
+ │  Geometric 4-DOF IK Solver ──► Joint Angles (Base, Shoulder, Elbow, ...)│
+ └───────────────────────────────────┬────────────────────────────────────┘
+                                     │ (Thread-Safe Target Queue)
+                                     ▼
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                          THREAD 3: ACTION                              │
+ │  Custom HAL (hal/arm_servos.py & hal/motor_chassis.py) ──► 50 Hz Out   │
+ └────────────────────────────────────────────────────────────────────────┘
+```
+
+### Modular Deliverables
+* **`/hal/motor_chassis.py`**: Ported STM32 tank movement commands (forward, turn, stop, 4-PWM mode, visual steering).
+* **`/hal/arm_servos.py`**: Ported STM32 / ArmPi bus servo protocol packet writers (115200 baud UART, 74HC126 buffer gating).
+* **`/vision/detector.py`**: OpenCV color/object tracking pipeline (640x480 @ 30 FPS, center deviation error, 3D world projection).
+* **`/kinematics/ik_solver.py`**: 6-DOF geometric coordinate resolver (analytical 4-DOF + wrist roll + claw, pitch search).
+* **`/core/autonomous_engine.py`**: The multi-threaded "See-Think-Act" Perception-Action engine loop.
+
+---
+
 ## 📂 Project Structure
 
 ```text
 tankbot_raspberrypi/
-├── config.py                 # Pi 4B Hardware PWM & pin mappings
+├── config.py                 # System v2.0 config (Camera, Vision, Motors, Servos)
 ├── main.py                   # Master launcher & CLI
-├── setup_pi4b.sh             # Pi 4B automated system setup script
-├── requirements.txt          # Python dependencies
+├── camera_processor.py       # Root modular wrapper for CameraProcessor
+├── color_tracker.py          # Root modular wrapper for ColorTracker & DetectionResult
+├── ik_bridge.py              # Root modular wrapper for IKBridge & ArmIK
+├── requirements.txt          # Python dependencies (OpenCV, PySerial, etc.)
+├── hal/
+│   ├── motor_chassis.py      # Tank tread 4-PWM drive & visual steering
+│   └── arm_servos.py         # 6-DOF Bus servo protocol packet writers
+├── vision/
+│   ├── camera_processor.py   # Threaded USB camera stream (640x480 @ 30 FPS)
+│   ├── color_tracker.py      # LAB/HSV color tracker & coordinate extraction
+│   └── detector.py           # Optical axis error & rotated bounding box detector
+├── kinematics/
+│   └── ik_solver.py          # 6-DOF geometric analytical inverse kinematics
 ├── core/
-│   ├── tankbot.py            # Master robot controller & autonomous state machines
-│   └── telemetry.py          # Telemetry data model
-├── hardware/
-│   ├── hal.py                # Hardware Abstraction Layer (gpiozero / lgpio / simulation)
-│   ├── motor_controller.py   # Dual DC track H-Bridge driver with hardware PWM
-│   ├── servo_controller.py   # 6-DOF Arm (LX-16A Bus Servos & PWM Servos)
-│   ├── ultrasonic.py         # HC-SR04 distance driver with median filter
-│   ├── line_follower.py      # 4-channel infrared line follower
-│   └── imu_sensor.py         # MPU6050 6-axis I2C driver
+│   ├── autonomous_engine.py  # 3-threaded See-Think-Act autonomous state machine
+│   ├── tankbot.py            # Master robot controller & autonomous integration
+│   └── telemetry.py          # Full telemetry schema including vision state
 ├── server/
-│   └── web_server.py         # aiohttp async web & WebSocket server
+│   └── web_server.py         # aiohttp server with /video_feed MJPEG stream
 ├── web/
-│   ├── index.html            # Mobile-first touch controller UI
-│   ├── style.css             # Cyber-robotic styling & responsive layout
-│   └── app.js                # Virtual joystick, WebSocket client, HUD rendering
+│   ├── index.html            # Mobile-first touch controller UI with VISION tab
+│   ├── style.css             # Cyber-robotic styling & responsive video HUD
+│   └── app.js                # Virtual joystick, live HUD, vision pills & presets
 └── systemd/
     └── tankbot.service       # systemd autostart unit
 ```
