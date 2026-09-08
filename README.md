@@ -8,8 +8,9 @@ Converted directly from the original STM32 firmware (`Tankbot-20251122T125555Z-1
 
 ## ⚡ Raspberry Pi 4B Hardware Optimizations
 
-* **Dual Hardware PWM**: Uses the Pi 4B's native hardware PWM channels (`PWM0` on GPIO 18 and `PWM1` on GPIO 19) for jitter-free, ultra-smooth DC motor speed regulation.
-* **Stable High-Speed PL011 UART**: Leverages the Pi 4B's primary hardware UART (`/dev/serial0` on GPIO 14/15) at 115200 baud to drive the Hiwonder / LewanSoul 6-DOF serial bus servos without clock drift.
+* **Pure 4-Channel PWM Motor Control**: Direct 1 kHz PWM control over `IN1`, `IN2`, `IN3`, and `IN4` with **zero enable pins required**—perfectly matching the Hiwonder OpenCar4in1 carrier baseboard where L298P `Enable A` and `Enable B` are hardwired high.
+* **Native Hiwonder I2C Line Tracker**: Communicates directly over Raspberry Pi I2C Bus 1 (address `0x78` / `0xF0`, register `0x01`) to poll all 4 infrared reflection sensors simultaneously without consuming discrete GPIOs.
+* **Stable High-Speed PL011 UART**: Leverages the Pi 4B's primary hardware UART (`/dev/serial0` on GPIO 14/15) at 115200 baud with 74HC126D hardware buffer control to drive the Hiwonder 6-DOF serial bus servos without clock drift.
 * **Modern OS Support**: Fully compatible with **Raspberry Pi OS (Debian Bookworm 64-bit & Bullseye)** using `gpiozero` and `lgpio` kernel interfaces (no deprecated `sysfs`).
 * **Multi-Client Asynchronous Server**: Powered by `aiohttp` and `websockets` streaming real-time full-duplex telemetry at 20 Hz.
 
@@ -18,17 +19,17 @@ Converted directly from the original STM32 firmware (`Tankbot-20251122T125555Z-1
 ## 🚀 Key Features
 
 * **Complete STM32 Hardware Port**:
-  * **Dual DC Track Drive (M1 / M2)**: PWM differential steering, variable speed (-100 to +100%), spin turns, and deadzone calibration.
-  * **6-DOF Robotic Arm**: Full support for Hiwonder / LewanSoul Serial Bus Servos (LX-16A protocol over UART) and standard PWM servos.
+  * **Dual DC Track Drive (M1 / M2)**: Pure 4-PWM differential steering, variable speed (-100 to +100%), spin turns, and deadzone calibration.
+  * **6-DOF Robotic Arm**: Full support for Hiwonder / LewanSoul Serial Bus Servos (LX-16A protocol over UART) with carrier board buffer gating (`TX_EN` / `RX_EN`).
   * **HC-SR04 Ultrasonic Distance Sensor**: High-precision pulse timing with median filtering and collision warning zones.
-  * **4-Channel Infrared Line Follower**: Differential steering tracking algorithm.
+  * **Hiwonder 4-Channel I2C Line Follower**: Native I2C register polling and autonomous track navigation.
   * **MPU6050 6-Axis IMU**: Real-time pitch, roll, and rollover/posture detection via I2C Bus 1.
 * **Intelligent Autonomous Modes**:
   * `MANUAL`: Direct touch joystick and D-Pad steering.
   * `OBSTACLE_AVOIDANCE`: Ported from STM32 Lesson 2 (`< 290mm` detection trigger, auto-reverse and spin evasive maneuver).
   * `OBJECT_FOLLOW`: Ported from STM32 Lesson 1 (Ultrasonic following; maintains optimal 20–35 cm distance).
-  * `LINE_FOLLOW`: Autonomous track navigation using 4-channel IR reflectance.
-  * `PICK & PLACE`: Exact 8-step robotic arm grasping routine ported from STM32 `Control.c`.
+  * `LINE_FOLLOW`: Autonomous track navigation using Hiwonder I2C line sensor readings.
+  * `PICK & PLACE`: Exact robotic arm grasping routine ported from STM32 `Control.c`.
 * **Mobile Touch Web UI**:
   * **Zero App Installation**: Connect from any smartphone (iOS Safari, Android Chrome) via local Wi-Fi / Hotspot.
   * **Proportional Touch Joystick**: Smooth 360° spring-back joystick with deadzone protection and touch-gesture locks (`touch-action: none`).
@@ -41,24 +42,29 @@ Converted directly from the original STM32 firmware (`Tankbot-20251122T125555Z-1
 
 ## 📐 Raspberry Pi 4B Pinout Mapping (BCM)
 
-| Component | Function | BCM Pin | Physical Pin | Notes |
+All connections use standard **Male-to-Female jumper wires** directly from carrier board sockets **P8 (Left)** and **P9 (Right)** to the Raspberry Pi 4B:
+
+| Signal Function | Baseboard Socket Pin (Male End) | Raspberry Pi 4B Pin (Female End) | Pi 4B BCM GPIO | Notes |
 | :--- | :--- | :--- | :--- | :--- |
-| **Left Motor IN1** | Direction | `GPIO 20` | Pin 38 | Digital Out |
-| **Left Motor IN2** | Direction | `GPIO 21` | Pin 40 | Digital Out |
-| **Left Motor PWM (ENA)** | Speed | `GPIO 18` | Pin 12 | **Pi 4B Hardware PWM0** |
-| **Right Motor IN3** | Direction | `GPIO 26` | Pin 37 | Digital Out |
-| **Right Motor IN4** | Direction | `GPIO 16` | Pin 36 | Digital Out |
-| **Right Motor PWM (ENB)** | Speed | `GPIO 19` | Pin 35 | **Pi 4B Hardware PWM1** |
-| **Ultrasonic TRIG** | Trigger | `GPIO 23` | Pin 16 | 3.3V Output Pulse |
-| **Ultrasonic ECHO** | Echo | `GPIO 24` | Pin 18 | **Voltage Divider! (1kΩ / 2kΩ: 5V $\to$ 3.3V)** |
-| **Serial Bus Servos TX** | UART TX | `GPIO 14` | Pin 8 | 115200 Baud (`/dev/serial0`) |
-| **Serial Bus Servos RX** | UART RX | `GPIO 15` | Pin 10 | 115200 Baud |
-| **MPU6050 IMU (SDA)** | I2C Data | `GPIO 2` | Pin 3 | I2C Bus 1 (SDA1) |
-| **MPU6050 IMU (SCL)** | I2C Clock | `GPIO 3` | Pin 5 | I2C Bus 1 (SCL1) |
-| **Line Tracker (L2, L1, R1, R2)**| IR Sensors | `GPIO 5, 6, 12, 25` | Pins 29, 31, 32, 22 | Active Low Inputs |
+| **Common Ground** | **P9 Pin 3** (`GND`) | **Pin 6** (`GND`) | `GND` | **Mandatory common ground** |
+| **Left Track IN1** | **P9 Pin 15** (`L298N_IN1`) | **Pin 38** | `GPIO 20` | PWM Direction & Speed |
+| **Left Track IN2** | **P8 Pin 13** (`L298N_IN2`) | **Pin 40** | `GPIO 21` | PWM Direction & Speed |
+| **Right Track IN3** | **P8 Pin 14** (`L298N_IN3`) | **Pin 37** | `GPIO 26` | PWM Direction & Speed |
+| **Right Track IN4** | **P8 Pin 15** (`L298N_IN4`) | **Pin 36** | `GPIO 16` | PWM Direction & Speed |
+| **Bus Servo TX** | **P8 Pin 19** (`Servo_TX`) | **Pin 8** (`UART0 TX`) | `GPIO 14` | 115200 Baud |
+| **Bus Servo RX** | **P8 Pin 20** (`Servo_RX`) | **Pin 10** (`UART0 RX`) | `GPIO 15` | 115200 Baud |
+| **Bus Servo TX Enable** | **P9 Pin 19** (`Servo_TX_EN`)| **Pin 13** | `GPIO 27` | 74HC126 buffer gate |
+| **Bus Servo RX Enable** | **P9 Pin 20** (`Servo_RX_EN`)| **Pin 11** | `GPIO 17` | 74HC126 buffer gate |
+| **Ultrasonic Trig** | **P9 Pin 18** (`Trig`) | **Pin 16** | `GPIO 23` | 3.3V Output Pulse |
+| **Ultrasonic Echo** | **P9 Pin 17** (`Echo`) | **Pin 18** | `GPIO 24` | **Use 1kΩ/2kΩ divider (5V $\to$ 3.3V)** |
+| **I2C SDA (Line & IMU)**| **P9 Pin 7** (`SDA`) | **Pin 3** (`I2C1 SDA`) | `GPIO 2` | Line tracker (0x78) & IMU (0x68) |
+| **I2C SCL (Line & IMU)**| **P9 Pin 8** (`SCL`) | **Pin 5** (`I2C1 SCL`) | `GPIO 3` | Shared I2C Bus 1 clock |
+| *(Optional) Buzzer* | **P8 Pin 18** (`Buzzer`) | **Pin 7** | `GPIO 4` | Active Buzzer |
+| *(Optional) Status LED*| **P8 Pin 16** (`LED1`) | **Pin 22** | `GPIO 25` | User Indicator LED |
+| *(Optional) Push Button*| **P9 Pin 5** (`KEY`) | **Pin 15** | `GPIO 22` | Onboard Key Button |
 
 > [!WARNING]
-> **HC-SR04 ECHO Pin 5V Protection**: The HC-SR04 Echo output is 5V. The Raspberry Pi 4B GPIO pins accept a maximum of 3.3V. Always wire a 1kΩ / 2kΩ resistor voltage divider between the Echo pin and `GPIO 24` to protect your Pi 4B.
+> **HC-SR04 ECHO Pin 5V Protection**: The HC-SR04 Echo output is 5V. The Raspberry Pi 4B GPIO pins accept a maximum of 3.3V. Always wire a 1kΩ / 2kΩ resistor voltage divider between the Echo pin and `GPIO 24` to protect your Pi 4B. See [WIRING_GUIDE.md](WIRING_GUIDE.md) for full details.
 
 ---
 

@@ -175,9 +175,16 @@ class TankbotWebServer:
 
     async def start(self):
         self._broadcast_task = asyncio.create_task(self._broadcast_telemetry_loop())
-        runner = web.AppRunner(self.app)
-        await runner.setup()
-        site = web.TCPSite(runner, self.config["host"], self.config["port"])
-        await site.start()
+        self.runner = web.AppRunner(self.app)
+        await self.runner.setup()
+        self.site = web.TCPSite(self.runner, self.config["host"], self.config["port"])
+        await self.site.start()
         logger.info(f"Tankbot Mobile Web UI server running at http://{self.config['host']}:{self.config['port']}")
-        return runner
+        return self.runner
+
+    async def stop(self):
+        if self._broadcast_task:
+            self._broadcast_task.cancel()
+        if hasattr(self, "runner") and self.runner:
+            await self.runner.cleanup()
+        logger.info("Tankbot Web UI server stopped.")

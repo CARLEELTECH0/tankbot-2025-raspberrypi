@@ -17,23 +17,43 @@ SERVER_CONFIG = {
     "broadcast_interval_hz": 20,
 }
 
-# Motor Controller (Hiwonder L298P Driver via Sockets P8 & P9)
-# Note: Baseboard ties Enable A and Enable B to 3.3V. PWM is applied directly to IN1-IN4.
+# Motor Controller: Pure 4-Channel PWM (Zero Enable Pins)
+# Baseboard ties Enable A and Enable B to 3.3V. IN1, IN2, IN3, IN4 are each independent PWM lines.
 MOTOR_CONFIG = {
-    # Left Motor (M1)
-    "left_in1": 20,       # Pi GPIO 20 (Pin 38) -> Socket P9 Pin 15 (L298N_IN1)
-    "left_in2": 21,       # Pi GPIO 21 (Pin 40) -> Socket P8 Pin 13 (L298N_IN2)
-    "left_pwm": None,     # Handled directly on IN1/IN2 (matches STM32 firmware)
+    # Left Motor (M1) - Dual PWM Direction & Speed
+    "in1": 20,            # Pi GPIO 20 (Pin 38) -> Socket P9 Pin 15 (L298N_IN1)
+    "in2": 21,            # Pi GPIO 21 (Pin 40) -> Socket P8 Pin 13 (L298N_IN2)
 
-    # Right Motor (M2)
-    "right_in1": 26,      # Pi GPIO 26 (Pin 37) -> Socket P8 Pin 14 (L298N_IN3)
-    "right_in2": 16,      # Pi GPIO 16 (Pin 36) -> Socket P8 Pin 15 (L298N_IN4)
-    "right_pwm": None,    # Handled directly on IN3/IN4 (matches STM32 firmware)
+    # Right Motor (M2) - Dual PWM Direction & Speed
+    "in3": 26,            # Pi GPIO 26 (Pin 37) -> Socket P8 Pin 14 (L298N_IN3)
+    "in4": 16,            # Pi GPIO 16 (Pin 36) -> Socket P8 Pin 15 (L298N_IN4)
 
     "invert_left": False,
     "invert_right": False,
     "pwm_freq": 1000,     # 1 KHz matching STM32 100us timer loop
-    "deadzone": 5,
+    "deadzone": 5,        # Deadband cutoff to prevent motor whine at near-zero
+}
+
+# Hiwonder 4-Channel Line Follower Module (I2C)
+# 7-bit Address: 0x78 (from STM32 8-bit write address 0xF0 >> 1), Register: 0x01
+LINE_FOLLOWER_CONFIG = {
+    "i2c_bus": 1,         # Standard Raspberry Pi I2C Bus 1
+    "i2c_addr": 0x78,     # 7-bit address (0xF0 >> 1)
+    "reg_addr": 0x01,     # Register 0x01 contains 4-channel bitmask [S4 S3 S2 S1]
+}
+
+# MPU6050 6-Axis IMU (I2C Bus 1)
+IMU_CONFIG = {
+    "enabled": True,
+    "i2c_bus": 1,
+    "i2c_addr": 0x68,
+}
+
+# I2C Bus Pin Assignments (Physical Pi 4B Pins 3 & 5)
+I2C_CONFIG = {
+    "sda_pin": 2,          # Pi GPIO 2 (Pin 3) -> Socket P9 Pin 7 (SDA)
+    "scl_pin": 3,          # Pi GPIO 3 (Pin 5) -> Socket P9 Pin 8 (SCL)
+    "i2c_bus": 1,
 }
 
 # 6-DOF Robotic Arm (Hiwonder 74HC126 Bus Servo Buffer via Sockets P8 & P9)
@@ -90,30 +110,6 @@ ULTRASONIC_CONFIG = {
     "follow_min_mm": 200,
     "follow_max_mm": 350,
     "follow_detect_mm": 600,
-}
-
-# I2C Bus 1 (MPU6050 & 4-Channel Line Follower via Socket P9)
-I2C_CONFIG = {
-    "sda_pin": 2,          # Pi GPIO 2 (Pin 3) -> Socket P9 Pin 7 (SDA)
-    "scl_pin": 3,          # Pi GPIO 3 (Pin 5) -> Socket P9 Pin 8 (SCL)
-    "i2c_bus": 1,
-}
-
-# Line Follower Config
-LINE_FOLLOWER_CONFIG = {
-    "left2_pin": 5,
-    "left1_pin": 6,
-    "right1_pin": 12,
-    "right2_pin": 25,
-    "i2c_bus": 1,
-    "i2c_addr": 0x78,
-}
-
-# IMU Config
-IMU_CONFIG = {
-    "enabled": True,
-    "i2c_bus": 1,
-    "i2c_addr": 0x68,
 }
 
 # Extra Peripherals on Sockets P8 & P9

@@ -220,14 +220,9 @@ class Tankbot:
                             self.motors.set_motors(0, 0)
 
                     elif self.mode == "LINE_FOLLOW":
-                        # Logic ported from STM32 linefollow()
-                        steering = self.line_follower.get_steering_recommendation()
-                        if steering < 0:
-                            self.motors.set_motors(60, 85)
-                        elif steering > 0:
-                            self.motors.set_motors(85, 60)
-                        else:
-                            self.motors.set_motors(75, 75)
+                        # Autonomous line following ported from STM32 Lesson 4 (I2C 4-Channel Line Tracker)
+                        left_spd, right_spd = self.line_follower.get_motor_speeds(base_speed=80)
+                        self.motors.set_motors(left_spd, right_spd)
 
                 # Update Telemetry Snapshot
                 self.telemetry.timestamp = now
