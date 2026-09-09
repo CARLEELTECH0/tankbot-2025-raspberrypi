@@ -134,6 +134,13 @@ The 6 serial bus servos plug directly into the Hiwonder board's servo ports. The
 | :--- | :--- | :--- | :--- | :--- |
 | **P8 Pin 17** (`E1`) | **Pin 12** | `GPIO 18` | 🟫 Brown | Sound pulse (High on clap/sound trigger) |
 
+### 4. Onboard Audible Buzzer
+* The buzzer is the round black cylinder located on the carrier board, driven by onboard NPN transistor `Q1`.
+* It is controlled via **Socket P8 Pin 18 (`Buzzer`)**:
+| Hiwonder Baseboard | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color | Function |
+| :--- | :--- | :--- | :--- | :--- |
+| **P8 Pin 18** (`Buzzer`) | **Pin 7** | `GPIO 4` | 🟧 Orange | Buzzer control (High=Beep, Low=Off / PWM tone) |
+
 ---
 
 ## ⚡ Part 4: Power & Common Ground Architecture
