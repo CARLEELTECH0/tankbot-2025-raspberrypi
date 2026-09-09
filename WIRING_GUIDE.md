@@ -72,74 +72,58 @@ The red L298N module drives the two continuous track DC motors.
 
 ---
 
-## 🦾 Part 2: Hiwonder Carrier Board (Robotic Arm Bus Servos)
+### 🦾 Part 2: Hiwonder Carrier Board (Robotic Arm Bus Servos + Buzzer ONLY)
 
-The 6 serial bus servos plug directly into the Hiwonder board's servo ports. The Raspberry Pi controls the arm via the onboard 74HC126 bus buffer using Male-to-Female jumpers into sockets **P8** (Left socket) and **P9** (Right socket).
+Only the 6 serial bus servos and the onboard buzzer go through the Hiwonder sockets **P8** (Left) and **P9** (Right). All sensors connect directly to the Raspberry Pi.
 
 ```text
-               TOP (Near Pin 1 Mark)
-          ┌───────────────────────────┐
-          │  P8 (LEFT)     P9 (RIGHT) │
-          │  Socket        Socket     │
-          │                           │
-  Pin 01  │  [ 1 ]         [ 1 ]      │  Pin 01
-  Pin 02  │  [ 2 ]         [ 2 ]      │  Pin 02
-  Pin 03  │  [ 3 ]         [ 3 ] ──► GND (Common Ground)
-  Pin 04  │  [ 4 ]         [ 4 ]      │  Pin 04
-  Pin 05  │  [ 5 ]         [ 5 ]      │  Pin 05
-  Pin 06  │  [ 6 ]         [ 6 ]      │  Pin 06
-  Pin 07  │  [ 7 ]         [ 7 ] ──► I2C SDA
-  Pin 08  │  [ 8 ]         [ 8 ] ──► I2C SCL
-  ...     │                           │
-  Pin 17  │  [ 17]         [ 17] ──► Ultrasonic Echo
-  Pin 18  │  [ 18]         [ 18] ──► Ultrasonic Trig
-  Pin 19  │  [ 19] ◄── TX  [ 19] ──► Servo TX Enable
-  Pin 20  │  [ 20] ◄── RX  [ 20] ──► Servo RX Enable
-          └───────────────────────────┘
-              BOTTOM (Near RST Button)
+               TOP (White servo ports & power switch)
+          ┌──────────────────────────────────────────────────┐
+          │  LEFT SOCKET (P8)          RIGHT SOCKET (P9)     │
+          │                                                  │
+  Pin 01  │  [  EMPTY  ]               [  EMPTY  ]           │ Pin 01
+  Pin 02  │  [  EMPTY  ]               [  EMPTY  ]           │ Pin 02
+  Pin 03  │  [  EMPTY  ]               [ USE: GND        ] ◄─┼ Pin 03 (Pi Pin 6 / GND)
+  ...     │   ... (Pins 4-17 EMPTY)     ... (Pins 4-18 EMPTY)│ ...
+  Pin 18  │  [ USE: Buzzer       ] ◄─┼ [  EMPTY  ]           │ Pin 18 (Pi Pin 7 / GPIO 4)
+  Pin 19  │  [ USE: Servo TX     ] ◄─┼ [ USE: Servo TX_EN] ◄─┼ Pin 19 (Pi Pin 8 & Pin 13)
+  Pin 20  │  [ USE: Servo RX     ] ◄─┼ [ USE: Servo RX_EN] ◄─┼ Pin 20 (Pi Pin 10 & Pin 11)
+          └──────┬──────────────────────────┬────────────────┘
+                 │                          │
+                 ▼                          ▼
+          Left: 18, 19, 20           Right: 3, 19, 20
 ```
 
-### Pin Table: Hiwonder Board to Raspberry Pi 4B (Servos)
-| Hiwonder Socket Pin | Raspberry Pi 4B Pin | Pi BCM GPIO | Suggested Color | Signal Function |
-| :--- | :--- | :--- | :--- | :--- |
-| **P8 Pin 19** (`Servo_TX`) | **Pin 8** (`UART0 TX`) | `GPIO 14` | 🟪 Purple | Arm Bus Servo Serial Data TX |
-| **P8 Pin 20** (`Servo_RX`) | **Pin 10** (`UART0 RX`)| `GPIO 15` | ⬜ White | Arm Bus Servo Serial Data RX |
-| **P9 Pin 19** (`Servo_TX_EN`)| **Pin 13** | `GPIO 27` | 🟫 Brown | 74HC126 Buffer TX Gate Enable |
-| **P9 Pin 20** (`Servo_RX_EN`)| **Pin 11** | `GPIO 17` | 🔘 Gray | 74HC126 Buffer RX Gate Enable |
-| **P9 Pin 3** (`GND`) | **Pin 6** (`GND`) | `GND` | ⬛ Black | System Common Ground |
+### Pin Table: Hiwonder Sockets to Raspberry Pi 4B
+| Hiwonder Socket | Socket Pin Number | Physical Position | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color | Function |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **P8 (Left)**  | **Pin 18** | 3rd hole from bottom | **Pin 7**  | `GPIO 4`  | 🟧 Orange | Onboard Buzzer |
+| **P8 (Left)**  | **Pin 19** | 2nd hole from bottom | **Pin 8**  | `GPIO 14` (UART TX) | 🟪 Purple | Arm Bus Servo TX |
+| **P8 (Left)**  | **Pin 20** | Bottom-most hole     | **Pin 10** | `GPIO 15` (UART RX) | ⬜ White  | Arm Bus Servo RX |
+| **P9 (Right)** | **Pin 3**  | 3rd hole from top    | **Pin 6**  | `GND`     | ⬛ Black  | System Common Ground |
+| **P9 (Right)** | **Pin 19** | 2nd hole from bottom | **Pin 13** | `GPIO 27` | 🟫 Brown  | 74HC126 Buffer TX Gate |
+| **P9 (Right)** | **Pin 20** | Bottom-most hole     | **Pin 11** | `GPIO 17` | 🔘 Gray   | 74HC126 Buffer RX Gate |
 
 ---
 
-## 📡 Part 3: Sensors (Line Follower & Ultrasonic)
+## 📡 Part 3: Sensors (Connected DIRECTLY to Raspberry Pi 4B)
 
-### 1. I2C Sensors (4-Channel Line Follower & MPU6050 IMU)
-* Plug the 4-channel Line Follower into the 4-pin I2C port on the Hiwonder board (`P11` or `P12`).
-* Connect the Pi I2C bus to the Hiwonder board:
-| Hiwonder Baseboard | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color |
-| :--- | :--- | :--- | :--- |
-| **P9 Pin 7** (`SDA`) | **Pin 3** (`I2C1 SDA`) | `GPIO 2` | 🟩 Green |
-| **P9 Pin 8** (`SCL`) | **Pin 5** (`I2C1 SCL`) | `GPIO 3` | 🟨 Yellow |
+### 1. HC-SR04 Ultrasonic Sensor
+* **Trig** $\rightarrow$ Raspberry Pi **GPIO 23** (Physical **Pin 16**)
+* **Echo** $\rightarrow$ Raspberry Pi **GPIO 24** (Physical **Pin 18**)
+* **VCC**  $\rightarrow$ Raspberry Pi **5V** (Physical **Pin 2** or **Pin 4**)
+* **GND**  $\rightarrow$ Raspberry Pi **GND** (Physical **Pin 14** or **Pin 20**)
 
-### 2. Ultrasonic Sensor (HC-SR04)
-* Plug the HC-SR04 into the ultrasonic header `P10` on the Hiwonder board.
-| Hiwonder Baseboard | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color | Note |
-| :--- | :--- | :--- | :--- | :--- |
-| **P9 Pin 18** (`Trig`) | **Pin 16** | `GPIO 23` | 🟨 Yellow | Trigger pulse |
-| **P9 Pin 17** (`Echo`) | **Pin 18** | `GPIO 24` | 🟦 Blue | Echo (Use 1k/2k divider if 5V) |
+### 2. I2C Sensors (Line Follower & MPU6050 Accelerometer/Gyro)
+* **SDA**  $\rightarrow$ Raspberry Pi **GPIO 2** (Physical **Pin 3**)
+* **SCL**  $\rightarrow$ Raspberry Pi **GPIO 3** (Physical **Pin 5**)
+* **VCC**  $\rightarrow$ Raspberry Pi **3.3V** (Physical **Pin 1**) or **5V**
+* **GND**  $\rightarrow$ Raspberry Pi **GND** (Physical **Pin 9**)
 
-### 3. Sound Sensor (Hiwonder Microphone Module)
-* Plug the 4-pin sensor cable into socket **`P13`** on the Hiwonder baseboard (labeled `5V GND E1 E2`, in the center below the STM32 socket).
-* The sensor signal pin routes internally to **Socket P8 Pin 17 (`E1`)**.
-| Hiwonder Baseboard | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color | Function |
-| :--- | :--- | :--- | :--- | :--- |
-| **P8 Pin 17** (`E1`) | **Pin 12** | `GPIO 18` | 🟫 Brown | Sound pulse (High on clap/sound trigger) |
-
-### 4. Onboard Audible Buzzer
-* The buzzer is the round black cylinder located on the carrier board, driven by onboard NPN transistor `Q1`.
-* It is controlled via **Socket P8 Pin 18 (`Buzzer`)**:
-| Hiwonder Baseboard | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color | Function |
-| :--- | :--- | :--- | :--- | :--- |
-| **P8 Pin 18** (`Buzzer`) | **Pin 7** | `GPIO 4` | 🟧 Orange | Buzzer control (High=Beep, Low=Off / PWM tone) |
+### 3. Sound Sensor
+* **Signal/OUT** $\rightarrow$ Raspberry Pi **GPIO 18** (Physical **Pin 12**)
+* **VCC**  $\rightarrow$ Raspberry Pi **3.3V** / **5V**
+* **GND**  $\rightarrow$ Raspberry Pi **GND**
 
 ---
 
