@@ -117,6 +117,7 @@ EXTRA_PERIPHERALS = {
     "buzzer_pin": 4,       # Pi GPIO 4  (Pin 7)  -> Socket P8 Pin 18 (Buzzer)
     "led_pin": 25,         # Pi GPIO 25 (Pin 22) -> Socket P8 Pin 16 (LED1)
     "key_pin": 22,         # Pi GPIO 22 (Pin 15) -> Socket P9 Pin 5  (KEY)
+    "sound_pin": 18,       # Pi GPIO 18 (Pin 12) -> Socket P8 Pin 17 (E1 / Sound Sensor)
 }
 
 # Safety & Simulation

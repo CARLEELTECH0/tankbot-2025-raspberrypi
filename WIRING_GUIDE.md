@@ -127,6 +127,13 @@ The 6 serial bus servos plug directly into the Hiwonder board's servo ports. The
 | **P9 Pin 18** (`Trig`) | **Pin 16** | `GPIO 23` | 🟨 Yellow | Trigger pulse |
 | **P9 Pin 17** (`Echo`) | **Pin 18** | `GPIO 24` | 🟦 Blue | Echo (Use 1k/2k divider if 5V) |
 
+### 3. Sound Sensor (Hiwonder Microphone Module)
+* Plug the 4-pin sensor cable into socket **`P13`** on the Hiwonder baseboard (labeled `5V GND E1 E2`, in the center below the STM32 socket).
+* The sensor signal pin routes internally to **Socket P8 Pin 17 (`E1`)**.
+| Hiwonder Baseboard | Raspberry Pi 4B Pin | Pi BCM GPIO | Wire Color | Function |
+| :--- | :--- | :--- | :--- | :--- |
+| **P8 Pin 17** (`E1`) | **Pin 12** | `GPIO 18` | 🟫 Brown | Sound pulse (High on clap/sound trigger) |
+
 ---
 
 ## ⚡ Part 4: Power & Common Ground Architecture
